@@ -17,7 +17,7 @@ Trong `Settings`, `agent_api_key` không có giá trị mặc định nên app c
 khi khởi động nếu thiếu biến môi trường. Hãy mô tả một tình huống cụ thể mà
 việc "chết sớm" này cứu bạn, so với việc để mặc định `"changeme"`.
 
-> Ví dụ khi mình deploy một revision mới mà quên thêm `AGENT_API_KEY`, app sẽ dừng ngay lúc khởi động và báo thiếu cấu hình, trước khi nhận traffic. Nếu có mặc định `changeme`, service vẫn chạy; người biết khóa mặc định có thể gọi `/ask` và dùng quota hoặc ngân sách của mình.
+> Ví dụ, khi deploy một revision mới mà quên cấu hình `AGENT_API_KEY`, app sẽ báo thiếu cấu hình lúc khởi động nên revision đó không sẵn sàng nhận traffic. Nếu mặc định là `changeme`, app vẫn chạy và ai biết giá trị này cũng có thể gọi `/ask` như người dùng hợp lệ. Trong bài lab, LLM là bản giả lập nên không phát sinh hóa đơn API thật, nhưng request trái phép vẫn dùng tài nguyên service và làm sai lệch số liệu sử dụng.
 
 ---
 
@@ -27,7 +27,7 @@ Chạy service và gọi `/ask` vài lần. Dán một dòng log JSON bạn thu 
 nêu **hai** việc bạn làm được với dòng log đó mà `print("đã trả lời xong")`
 không làm được.
 
-> Log mình lấy sau ba lượt gọi thử `/ask`: `{"event": "ask_completed", "level": "info", "timestamp": "2026-09-29T04:51:29.414915+00:00", "user_id": "exercise-cp1", "tokens_in": 143, "tokens_out": 56, "cost_usd": 5.505e-05}`. Mình có thể lọc log theo `event` hoặc `user_id` để tìm request cần xem, và cộng `tokens_in`, `tokens_out`, `cost_usd` để theo dõi mức sử dụng. Một dòng `print("đã trả lời xong")` không có các trường này để máy lọc hay tổng hợp.
+> Đây là một dòng log mình ghi lại sau khi gọi thử `/ask`: `{"event": "ask_completed", "level": "info", "timestamp": "2026-09-29T04:51:29.414915+00:00", "user_id": "exercise-cp1", "tokens_in": 143, "tokens_out": 56, "cost_usd": 5.505e-05}`. Nhờ có cấu trúc này, mình lọc được các lần gọi theo `event` hoặc `user_id`, và có thể cộng token cùng chi phí để xem mức sử dụng. Dòng `print("đã trả lời xong")` vẫn tìm được bằng chữ, nhưng không có trường riêng để lọc theo user hay tổng hợp token và chi phí.
 
 ---
 
@@ -48,7 +48,7 @@ docker images | grep agent
 
 Giải thích: phần dung lượng chênh lệch đó là những gì?
 
-> Mình dùng Dockerfile một stage ban đầu và Dockerfile multi-stage hiện tại để build cùng mã nguồn. Docker hiển thị image một stage là 1.73 GB, còn image multi-stage là 271 MB — giảm khoảng 1.46 GB. Phần chênh lệch chủ yếu đến từ image nền `python:3.11` đầy đủ của bản cũ; bản mới dùng `python:3.11-slim` làm runtime và chỉ chép thư viện Python cần thiết cùng mã `app` và `utils` từ stage build. Mã nguồn ứng dụng nhỏ nên không phải nguyên nhân chính của phần chênh lệch.
+> Mình build hai image từ cùng mã nguồn: bản một stage là 1.73 GB, còn bản multi-stage là 271 MB, giảm khoảng 1.46 GB. Khác biệt lớn nhất là image nền `python:3.11` đầy đủ ở bản cũ so với `python:3.11-slim` ở runtime của bản mới. Bản multi-stage cũng chỉ đưa các thư viện đã cài và mã `app` với `utils` vào image cuối; các file của stage build không cần thiết lúc chạy sẽ không được giữ lại. Vì mã ứng dụng nhỏ, phần lớn mức giảm đến từ môi trường nền và nội dung không cần ở runtime.
 
 ---
 
@@ -58,7 +58,7 @@ Sửa một ký tự trong `app/main.py` rồi build lại. Với Dockerfile c�
 layer nào được dùng lại từ cache, layer nào phải chạy lại? Nếu bạn đặt
 `COPY . .` lên trước `RUN pip install` thì kết quả khác thế nào?
 
-> Khi sửa một ký tự trong `app/main.py`, Docker vẫn dùng cache cho layer chép `requirements.txt` và cài package vì các layer đó đứng trước source code. Layer chép `app` phải chạy lại, cùng các layer phía sau nó. Nếu chuyển `COPY . .` lên trước `RUN pip install`, mỗi lần sửa code layer `COPY` đổi; layer cài package phía sau cũng mất cache và phải chạy lại dù `requirements.txt` không đổi.
+> Khi mình sửa `app/main.py`, Docker vẫn dùng cache cho `COPY requirements.txt` và `RUN pip install`, vì nội dung dependency chưa đổi. Layer chép `app` bị làm lại; các lệnh sau nó cũng phải được xử lý lại theo layer mới. Nếu đặt `COPY . .` trước `RUN pip install`, mỗi lần sửa file trong build context sẽ làm layer `COPY` đổi, kéo theo cài package chạy lại dù `requirements.txt` vẫn y nguyên.
 
 ---
 
@@ -68,7 +68,7 @@ Container mặc định chạy bằng root. Mô tả chuỗi sự kiện dẫn t
 trong code Python của bạn" tới "kẻ tấn công có quyền cao trên máy host", và
 lệnh `USER` cắt đứt chuỗi đó ở chỗ nào.
 
-> Nếu lỗ hổng cho phép chạy lệnh tùy ý, kẻ tấn công chiếm được process của app. Khi process chạy bằng root, họ có quyền root bên trong container, có thể đọc secret và sửa file; nếu container có mount hoặc runtime/kernel có lỗ hổng, họ có thể tìm đường ảnh hưởng tới host. `USER app` bỏ quyền root của process ngay từ đầu, nên giảm quyền và tác động của vụ khai thác; nó không bảo đảm rằng mọi lỗ hổng container escape đều biến mất.
+> Nếu lỗ hổng trong app cho phép chạy lệnh tùy ý, kẻ tấn công có thể điều khiển process của app. Chạy bằng root sẽ cho process quyền root trong container; nếu container có mount hoặc quyền đặc biệt, hay runtime/kernel có lỗ hổng, kẻ tấn công có thể tìm đường gây ảnh hưởng tới host. `USER app` chạy process bằng tài khoản ít quyền, cắt bớt bước leo từ quyền của app lên root trong container. Nó giảm rủi ro nhưng không tự ngăn mọi kiểu container escape, và cũng không giấu được secret đã cấp cho chính process.
 
 ---
 
@@ -79,7 +79,7 @@ phút đồng hồ (reset lúc giây 00), một người dùng có thể gửi t
 request trong 2 giây liên tiếp khi hạn mức là 10/phút? Giải thích cách đạt được
 con số đó.
 
-> Có thể gửi 20 request trong khoảng 2 giây: gửi 10 request ngay trước khi phút hiện tại kết thúc, rồi 10 request ngay sau khi phút mới bắt đầu. Bộ đếm theo phút tường sẽ reset ở ranh giới đó nên cả hai nhóm đều được chấp nhận. Sliding window 60 giây vẫn nhìn thấy đủ 20 request trong cùng cửa sổ và chặn khi vượt hạn mức.
+> Tối đa 20 request: gửi 10 request ngay trước mốc chuyển phút và 10 request ngay sau đó. Bộ đếm theo phút đồng hồ vừa reset nên cả hai nhóm đều lọt qua, dù chúng được gửi cách nhau chỉ khoảng hai giây. Với sliding window, 20 request đó vẫn nằm trong cùng cửa sổ 60 giây nên request vượt hạn mức sẽ bị chặn.
 
 ---
 
@@ -88,7 +88,7 @@ con số đó.
 Hai cơ chế này khác nhau ở điểm nào? Cho một tình huống mà rate limit cho qua
 nhưng cost guard phải chặn, và một tình huống ngược lại.
 
-> Rate limit đếm số request trong 60 giây gần nhất; cost guard cộng chi phí theo user trong tháng. Nếu mình còn dưới 10 request trong cửa sổ nhưng số đã ghi nhận đã vượt ngân sách tháng, rate limit vẫn cho qua còn cost guard trả 402. Ngược lại, nếu gửi request thứ 11 trong 60 giây dù mỗi request rẻ và ngân sách tháng còn nhiều, rate limit trả 429 còn cost guard chưa chặn. Trong code hiện tại, cost guard kiểm tra số đã ghi nhận trước request; vì route không truyền chi phí ước tính, nó không dự đoán chính xác chi phí của chính request sắp chạy.
+> Rate limit giới hạn số request trong 60 giây; cost guard cộng chi phí đã ghi nhận theo từng user trong tháng. Nếu mình chưa chạm rate limit nhưng chi phí đã ghi nhận vượt ngân sách tháng, request vẫn qua bước rate limit rồi bị cost guard trả 402. Ngược lại, request thứ 11 trong 60 giây bị rate limit trả 429 dù ngân sách tháng còn nhiều. Trong code hiện tại, route gọi `guard.check(user_id)` mà không truyền chi phí ước tính, nên guard chỉ kiểm tra khoản đã ghi nhận trước đó, chưa tính được chi phí của request sắp chạy.
 
 ---
 
@@ -97,7 +97,7 @@ nhưng cost guard phải chặn, và một tình huống ngược lại.
 Nếu gộp hai endpoint làm một và cho nó kiểm tra Redis, chuyện gì xảy ra với cụm
 3 container khi Redis mất kết nối 30 giây? Trả lời theo đúng thứ tự sự kiện.
 
-> Đầu tiên, Redis mất kết nối nên endpoint gộp `/health` kiểm tra Redis và trả 503 ở cả ba container. Nếu nền tảng dùng endpoint này làm liveness probe, nó coi cả ba instance là hỏng và khởi động lại chúng; Redis vẫn mất kết nối nên các instance mới tiếp tục fail probe, làm service chập chờn hoặc không còn instance nhận request. Vì vậy `/health` nên chỉ kiểm tra process còn sống, còn `/ready` trả 503 để ngừng route traffic khi Redis lỗi. Với Docker Compose hiện tại, healthcheck đánh dấu container `unhealthy`, nhưng restart policy không tự restart container chỉ vì trạng thái đó.
+> Redis mất kết nối nên endpoint gộp `/health` trả 503 ở cả ba container. Probe sẽ đánh dấu chúng không khỏe; nếu nền tảng dùng endpoint này làm liveness probe, nền tảng có thể khởi động lại cả ba. Vì Redis vẫn đang lỗi, instance mới cũng tiếp tục fail probe và vòng lặp có thể kéo dài. Riêng Docker Compose hiện tại chỉ đánh dấu container `unhealthy`; `restart: unless-stopped` không tự khởi động lại container chỉ vì trạng thái đó. Khi Redis kết nối lại, probe có thể thành công trở lại. Tách hai endpoint giúp `/health` báo process còn sống, còn `/ready` báo chưa thể nhận traffic khi Redis không truy cập được.
 
 ---
 
@@ -107,7 +107,7 @@ Chạy `docker compose up --scale agent=3` rồi gọi `/ask` nhiều lần vớ
 `X-User-Id`. Quan sát `history_length` trong response. Nếu lịch sử được lưu
 trong một dict Python thay vì Redis, bạn sẽ thấy con số đó thay đổi thế nào?
 
-> Trong lần kiểm tra CP4 trước, với Redis dùng chung mình thấy `history_length` lần lượt là 0, 2, 4; mỗi lượt hỏi trước đó thêm một message của user và một của assistant. Nếu thay Redis bằng dict trong RAM, mỗi container sẽ giữ một bản lịch sử riêng. Request tới container chưa từng nhận user đó có thể lại trả 0, còn container đã xử lý vài lượt có thể trả 2 hoặc 4; vì vậy con số sẽ nhảy tùy request rơi vào replica nào, thay vì phản ánh một lịch sử chung.
+> Khi kiểm tra với Redis dùng chung, mình thấy `history_length` lần lượt là 0, 2, 4; mỗi câu hỏi trước đó thêm một message của user và một của assistant. Nếu dùng dict trong RAM, mỗi container sẽ có lịch sử riêng. Một request có thể rơi vào replica chưa xử lý user đó và trả 0, trong khi replica khác đã có lịch sử và trả 2 hoặc 4. Vì vậy con số có thể tăng giảm giữa các lần gọi tùy request tới replica nào, thay vì thể hiện một lịch sử chung.
 
 ---
 
@@ -117,4 +117,4 @@ Ghi lại **một** lỗi bạn gặp khi deploy lên cloud (build fail, health 
 timeout, sai REDIS_URL, app không đọc `$PORT`...): thông báo lỗi là gì, bạn
 tìm ra nguyên nhân bằng cách nào, và sửa ra sao?
 
-> Lỗi thật mình gặp khi chuẩn bị GCP là `The project property must be set to a valid project ID, not the project name [Day12]`. Mình đã nhập tên hiển thị `Day12` vào lệnh chọn project; thông báo của `gcloud` chỉ ra rằng chỗ này cần Project ID. Cách sửa là lấy đúng trường Project ID trong Cloud Console rồi dùng `gcloud config set project <PROJECT_ID>`. Đây là lỗi trước khi deploy: hiện mình chưa deploy Cloud Run nên chưa có lỗi build hay health check thực tế để ghi.
+> Khi kiểm tra `/ask` trên Render bằng CP5, test báo `{"detail":"invalid or missing API key"}` thay vì nhận được câu trả lời. Mình đối chiếu cấu hình mà test dùng với biến `AGENT_API_KEY` trên Render và phát hiện khóa kiểm tra ở máy chưa khớp. Mình cập nhật khóa trong môi trường local cho trùng với khóa đã lưu trên Render, không đưa giá trị khóa vào log hay tài liệu, rồi chạy lại test và `/ask` trả về thành công. Lỗi nằm ở xác thực request chứ không phải ở bước build image.
