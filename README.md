@@ -1,5 +1,7 @@
 # K4 — Level 3B, Ngày 12: Hạ Tầng Cloud & Deployment (240 phút)
 
+![CI](https://github.com/HongNhung-0204/K4-L3B-DAY12-NguyenThiHongNhung-2A202602557-CloudServicesAndDeployment/actions/workflows/ci.yml/badge.svg?branch=main)
+
 Đưa một AI agent từ `localhost:8000` lên một địa chỉ công khai mà người khác
 gọi được, có bảo mật, có giới hạn chi phí, và không sập khi bạn deploy bản mới.
 
@@ -196,7 +198,7 @@ K4-L3B-DAY12-<HoVaTen>-<MSSV>-CloudServicesAndDeployment/
 ├── railway.toml           # CP5 — cấu hình Railway
 ├── render.yaml            # CP5 — cấu hình Render
 ├── screenshots/           # Ảnh chụp màn hình bản deploy
-├── .github/workflows/     # ★ BONUS — workflow CI/CD bạn tự viết (chưa có sẵn)
+├── .github/workflows/     # ★ BONUS — GitHub Actions CI/CD
 └── tests/
     ├── test_cp1.py … test_cp5.py
     ├── test_bonus_cicd.py # BONUS — chấm workflow CI/CD

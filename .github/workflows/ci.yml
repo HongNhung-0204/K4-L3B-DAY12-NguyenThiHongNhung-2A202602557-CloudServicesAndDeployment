@@ -1,0 +1,74 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run automated tests
+        env:
+          AGENT_API_KEY: ci-dummy
+          REDIS_URL: fake://
+        run: >-
+          python -m pytest tests/ -v
+          --ignore=tests/test_cp5.py
+          --ignore=tests/test_bonus_cicd.py
+
+  build:
+    name: Build Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Build image
+        run: docker build -t day12-agent:ci .
+
+  deploy:
+    name: Deploy to Render
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.RENDER_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "Configure the RENDER_DEPLOY_HOOK_URL repository secret."
+            exit 1
+          fi
+          curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK_URL"
+
+      - name: Smoke test deployed service
+        env:
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+        run: |
+          if [ -z "$PUBLIC_URL" ]; then
+            echo "Configure the PUBLIC_URL repository variable."
+            exit 1
+          fi
+          sleep 45
+          curl --fail --silent --show-error --retry 12 --retry-delay 10 --retry-all-errors "$PUBLIC_URL/health"
+          curl --fail --silent --show-error --retry 12 --retry-delay 10 --retry-all-errors "$PUBLIC_URL/ready"
