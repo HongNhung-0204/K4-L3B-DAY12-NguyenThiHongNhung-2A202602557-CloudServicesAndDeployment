@@ -1,8 +1,7 @@
 # Checkpoint 5 — Deployment
 
-This checkpoint currently uses the local fallback. The Render Blueprint is
-prepared in `render.yaml`, but the public service has not been created yet, so
-there is no public HTTPS URL to record.
+This checkpoint is deployed on Render. The public service URL below was taken
+from the deployed web service shown in the Render dashboard.
 
 **Never put API key values in this file.** Store secrets in `.env` locally or in
 the cloud platform's secret manager.
@@ -20,8 +19,8 @@ the cloud platform's secret manager.
 | Item | Value |
 |------|-------|
 | Local URL | http://localhost:8000 |
-| Public URL | Pending Render deployment |
-| Platform | Docker Compose local fallback; Render Blueprint prepared, deployment pending |
+| Public URL | https://day12-agent-thox.onrender.com |
+| Platform | Render Free web service with Render Key Value |
 | Checked | 2026-09-29 |
 
 ## Environment
@@ -34,7 +33,7 @@ the cloud platform's secret manager.
 | `RATE_LIMIT_PER_MINUTE` | Yes | Compose default `10` |
 | `MONTHLY_BUDGET_USD` | Yes | Compose default `10.0` |
 | `LOG_LEVEL` | Yes | Compose default `INFO` |
-| `LOCAL_FALLBACK` | Yes | `true` in local `.env` |
+| `LOCAL_FALLBACK` | Yes | `false` in local `.env` for public deployment checks |
 
 ## Local Verification
 
@@ -69,18 +68,14 @@ Compose service status separately if submitting the fallback evidence.
 
 ## Render Deployment Status
 
-`render.yaml` defines a Docker web service and a private Key Value datastore in
+`render.yaml` defines a Docker web service and a Key Value datastore in
 Singapore. The web service gets `REDIS_URL` from the Key Value connection
-string, and Render prompts for `AGENT_API_KEY` when the Blueprint is created.
-The key stays in Render's environment settings; do not put its value in this
-file, chat, or Git.
+string. The API key stays in Render's environment settings; its value is not
+stored in this file, chat, or Git. The public URL above is the deployed service.
 
-To create the service, sign in to Render, choose **New > Blueprint**, connect
-this repository and its updated `main` branch, then apply the Blueprint. Enter
-`AGENT_API_KEY` only in Render's prompt. Wait for both services to finish
-deploying, then copy the web service's public HTTPS URL into the Service Status
-table above. Check `/health` and `/ready` on that URL. After the deployment is
-live, set `LOCAL_FALLBACK=false` in local `.env` before running the CP5 grader.
+The CP5 grader checks `/health`, `/ready`, and that unauthenticated `/ask`
+requests return 401. Set `LOCAL_FALLBACK=false` in local `.env` before running
+the CP5 grader so these checks target the public service.
 
 Render's free web service can sleep after 15 minutes idle; its first request
 after that can take about a minute. Free Key Value can lose its in-memory data
