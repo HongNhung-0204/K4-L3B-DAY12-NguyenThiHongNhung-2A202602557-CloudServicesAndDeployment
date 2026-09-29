@@ -477,7 +477,8 @@ rồi bị kill cứng — tệ hơn là không viết gì.
 ### Thử chạy
 
 ```bash
-docker compose up -d --scale agent=3
+# Each agent gets an ephemeral host port; Nginx provides localhost:8000.
+AGENT_PORT_MAPPING=8000 docker compose --profile scaling up -d --scale agent=3
 docker compose ps                      # 3 container agent
 
 # Gọi nhiều lần với cùng user — history_length phải TĂNG DẦN dù đổi container
@@ -489,9 +490,17 @@ for i in $(seq 1 5); do
 done
 ```
 
-Muốn xem load balancing thật thì bật thêm service `nginx` (cấu hình đã có sẵn ở
-`nginx/nginx.conf`) và gọi qua cổng 80 — phần mở rộng tùy chọn, không phải
-bonus chấm điểm riêng.
+Trên PowerShell, đặt biến để Docker cấp cổng host tạm thời cho từng agent:
+
+```powershell
+$env:AGENT_PORT_MAPPING = "8000"
+docker compose --profile scaling up -d --scale agent=3
+Remove-Item Env:AGENT_PORT_MAPPING
+```
+
+Profile `scaling` khởi động Nginx với cấu hình ở `nginx/nginx.conf`; gọi qua
+`localhost:8000`. Profile này là phần mở rộng tùy chọn, không phải bonus chấm
+điểm riêng.
 
 ### ✅ Checkpoint 4 — Start +200 phút
 
